@@ -1,4 +1,7 @@
--- Create a graph demo database
+-- 1. Obsluga prostych zapytań. Tworzenie grafowej bazy danych, zapytania.
+-- Na podstawie oficjalnej dokumentacji.
+
+-- Stworzmy baze danych
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE NAME = 'graphdemo')
 	CREATE DATABASE GraphDemo;
 GO
@@ -6,7 +9,7 @@ GO
 USE GraphDemo;
 GO
 
--- Create NODE tables
+-- Stworzmy node
 CREATE TABLE Person (
   ID INTEGER PRIMARY KEY,
   name VARCHAR(100)
@@ -48,9 +51,8 @@ INSERT INTO City (ID, name, stateName)
 		 , (2,'Seattle','WA')
 		 , (3,'Redmond','WA');
 
--- Insert into edge table. While inserting into an edge table,
--- you need to provide the $node_id from $from_id and $to_id columns.
-/* Insert which restaurants each person likes */
+-- Dodajmy dane
+
 INSERT INTO likes
 	VALUES ((SELECT $node_id FROM Person WHERE ID = 1), (SELECT $node_id FROM Restaurant WHERE ID = 1), 9)
 		 , ((SELECT $node_id FROM Person WHERE ID = 2), (SELECT $node_id FROM Restaurant WHERE ID = 2), 9)
@@ -58,7 +60,6 @@ INSERT INTO likes
 		 , ((SELECT $node_id FROM Person WHERE ID = 4), (SELECT $node_id FROM Restaurant WHERE ID = 3), 9)
 		 , ((SELECT $node_id FROM Person WHERE ID = 5), (SELECT $node_id FROM Restaurant WHERE ID = 3), 9);
 
-/* Associate in which city live each person*/
 INSERT INTO livesIn
 	VALUES ((SELECT $node_id FROM Person WHERE ID = 1), (SELECT $node_id FROM City WHERE ID = 1))
 		 , ((SELECT $node_id FROM Person WHERE ID = 2), (SELECT $node_id FROM City WHERE ID = 2))
@@ -66,13 +67,11 @@ INSERT INTO livesIn
 		 , ((SELECT $node_id FROM Person WHERE ID = 4), (SELECT $node_id FROM City WHERE ID = 3))
 		 , ((SELECT $node_id FROM Person WHERE ID = 5), (SELECT $node_id FROM City WHERE ID = 1));
 
-/* Insert data where the restaurants are located */
 INSERT INTO locatedIn
 	VALUES ((SELECT $node_id FROM Restaurant WHERE ID = 1), (SELECT $node_id FROM City WHERE ID =1))
 		 , ((SELECT $node_id FROM Restaurant WHERE ID = 2), (SELECT $node_id FROM City WHERE ID =2))
 		 , ((SELECT $node_id FROM Restaurant WHERE ID = 3), (SELECT $node_id FROM City WHERE ID =3));
 
-/* Insert data into the friendOf edge */
 INSERT INTO friendOf
 	VALUES ((SELECT $NODE_ID FROM Person WHERE ID = 1), (SELECT $NODE_ID FROM Person WHERE ID = 2))
 		 , ((SELECT $NODE_ID FROM Person WHERE ID = 2), (SELECT $NODE_ID FROM Person WHERE ID = 3))
@@ -81,26 +80,48 @@ INSERT INTO friendOf
 		 , ((SELECT $NODE_ID FROM Person WHERE ID = 5), (SELECT $NODE_ID FROM Person WHERE ID = 4));
 
 
--- Find Restaurants that John likes
+--Zobaczmy nasze dane:
+--AS NODE 
+-- Dokłada 2 kolumny:
+-- graph_id - wewnetrzna SQL Serverowa kolumna, nie da sie po niej prowadzic zapytan
+-- node_id - id wierzchołka grafu
+
+
+--Krawędź będzie miała 8 domyślnych kolumn, które zostaną automatycznie dodane dla każdej utworzonej tabeli, 
+--z czego tylko 3 z nich będą automatycznie widoczne w każdym zapytaniu (nieukryte).
+
+--graph_id_<hex_string> - wewnętrzna kolumna graph_id grafu (obecnie możemy mieć tylko jeden graf na bazę danych)
+--$edge_id_<hex_string> - zewnętrzne $edge_id, które jednoznacznie identyfikuje krawędź (relację)
+--from_obj_id_<hex_string> - przechowuje object_id węzła FROM
+--from_id_<hex_string> - przechowuje graph_id węzła FROM
+--$from_id_<hex_string> - przechowuje node_id węzła FROM
+--to_obj_id_<hex_string> - przechowuje object_id węzła TO
+--to_id_<hex_string> - przechowuje graph_id węzła TO
+--$to_id_<hex_string> - przechowuje node_id węzła TO
+
+
+-- Przeprowadzmy proste zapytania:
+
+-- Jakie restauracje lubi John? 
 SELECT Restaurant.name
 FROM Person, likes, Restaurant
 WHERE MATCH (Person-(likes)->Restaurant)
 AND Person.name = 'John';
 
--- Find Restaurants that John's friends like
+-- Jakie restauracje lubia przyjaciele Johna?
 SELECT Restaurant.name
 FROM Person person1, Person person2, likes, friendOf, Restaurant
 WHERE MATCH(person1-(friendOf)->person2-(likes)->Restaurant)
 AND person1.name='John';
 
--- Find people who like a restaurant in the same city they live in
+-- Jacy ludzie lubia restauracje w miastach ktore oni zamieszkuja?
 SELECT Person.name
 FROM Person, likes, Restaurant, livesIn, City, locatedIn
 WHERE MATCH (Person-(likes)->Restaurant-(locatedIn)->City AND Person-(livesIn)->City);
 
--- Find friends-of-friends-of-friends, excluding those cases where the relationship "loops back".
--- For example, Alice is a friend of John; John is a friend of Mary; and Mary in turn is a friend of Alice.
--- This causes a "loop" back to Alice. In many cases, it is necessary to explicitly check for such loops and exclude the results.
+-- Znajdź znajomych znajomych znajomych, wykluczając przypadki, w których występuje "pętla" relacji.
+-- Na przykład, Alicja jest przyjacielem Johna; Johna jest przyjacielem Marii; a Maria z kolei jest przyjacielem Alicji.
+-- Powoduje to "pętlę" z powrotem do Alicji. W wielu przypadkach konieczne jest jawnie sprawdzenie takich pętli i wykluczenie wyników.
 SELECT CONCAT(Person.name, '->', Person2.name, '->', Person3.name, '->', Person4.name)
 FROM Person, friendOf, Person as Person2, friendOf as friendOffriend, Person as Person3, friendOf as friendOffriendOfFriend, Person as Person4
 WHERE MATCH (Person-(friendOf)->Person2-(friendOffriend)->Person3-(friendOffriendOfFriend)->Person4)
@@ -108,3 +129,19 @@ AND Person2.name != Person.name
 AND Person3.name != Person2.name
 AND Person4.name != Person3.name
 AND Person.name != Person4.name;
+
+USE graphdemo;
+GO
+
+DROP TABLE IF EXISTS likes;
+DROP TABLE IF EXISTS Person;
+DROP TABLE IF EXISTS Restaurant;
+DROP TABLE IF EXISTS City;
+DROP TABLE IF EXISTS friendOf;
+DROP TABLE IF EXISTS livesIn;
+DROP TABLE IF EXISTS locatedIn;
+
+USE master;
+GO
+DROP DATABASE graphdemo;
+GO
