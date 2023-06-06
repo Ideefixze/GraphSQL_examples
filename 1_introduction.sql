@@ -122,7 +122,7 @@ WHERE MATCH (Person-(likes)->Restaurant-(locatedIn)->City AND Person-(livesIn)->
 -- Znajdź znajomych znajomych znajomych, wykluczając przypadki, w których występuje "pętla" relacji.
 -- Na przykład, Alicja jest przyjacielem Johna; Johna jest przyjacielem Marii; a Maria z kolei jest przyjacielem Alicji.
 -- Powoduje to "pętlę" z powrotem do Alicji. W wielu przypadkach konieczne jest jawnie sprawdzenie takich pętli i wykluczenie wyników.
-SELECT CONCAT(Person.name, '->', Person2.name, '->', Person3.name, '->', Person4.name)
+SELECT CONCAT(Person.name, '=>', Person2.name, '=>', Person3.name, '=>', Person4.name)
 FROM Person, friendOf, Person as Person2, friendOf as friendOffriend, Person as Person3, friendOf as friendOffriendOfFriend, Person as Person4
 WHERE MATCH (Person-(friendOf)->Person2-(friendOffriend)->Person3-(friendOffriendOfFriend)->Person4)
 AND Person2.name != Person.name
