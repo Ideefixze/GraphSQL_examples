@@ -1,4 +1,5 @@
--- 2. Mieszane krawędzie na przykładzie zadłużeń u osób i banków.
+-- 2. MATCH 
+-- Mieszane krawędzie na przykładzie zadłużeń u osób i banków.
 -- Przemiennosc uzywania MATCH i zapytan SQL.
 
 -- Stworzmy baze danych
